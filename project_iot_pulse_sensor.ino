@@ -21,6 +21,7 @@ const int PulseWire = 0;
 int Threshold = 550;
 PulseSensorPlayground pulseSensor;
 int myBPM;
+
 //------------------ MAX30100 ----------------------//
 #include "MAX30100_PulseOximeter.h"
 #define REPORTING_PERIOD_MS     1000
@@ -29,7 +30,10 @@ uint32_t tsLastReport = 0;
 int bpm;
 int spo2;
 
-
+//------------------- MLX90614 ---------------------//
+#include <Adafruit_MLX90614.h>
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+int temperature;
 
 //----------------- Fetch Data ---------------------//
 String namaData, nikData;
@@ -61,47 +65,42 @@ void setup() {
   } else {
     Serial.println("SUCCESS");
   }
+
+  //--------------- MLX90614 -------------------//
+  while (!Serial);
+  if (!mlx.begin()) {
+    while (1);
+  }
 }
 
 void loop(){
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    fetchDataPasien();
-    // checkHeartbeat();
-    poxData();
-    if (!namaData.isEmpty() && !nikData.isEmpty()) {
-      putHearRateData();
-      putSaturationData();
+  pox.update();
+  if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+
+    bpm = pox.getHeartRate();
+    spo2 = pox.getSpO2();
+    temperature = mlx.readObjectTempC();
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      fetchDataPasien();
+
+      if (!namaData.isEmpty() && !nikData.isEmpty()) {
+        postHearRateData();
+        postSaturationData();
+        postTemperatureData();
+      }
     }
-    delay(1000);
+      tsLastReport = millis();
   }
+
 }
 
 void checkHeartbeat(){
   if (pulseSensor.sawStartOfBeat()) {           
-    myBPM = pulseSensor.getBeatsPerMinute();  
-                                               
-    // Serial.println("♥  A HeartBeat Happened ! "); 
-    // Serial.print("BPM: ");                        
-    // Serial.println(myBPM);                        
+    myBPM = pulseSensor.getBeatsPerMinute();                  
   }
-
   delay(20);                    
-}
-
-void poxData(){
-  pox.update();
-      if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
-        // Serial.print("Heart rate:");
-        // Serial.print(pox.getHeartRate());
-        // Serial.print("bpm / SpO2:");
-        // Serial.print(pox.getSpO2());
-        // Serial.println("%");
-        bpm = pox.getHeartRate();
-        spo2 = pox.getSpO2();
-
-        tsLastReport = millis();
-    }
 }
 
 void fetchDataPasien(){
@@ -119,60 +118,32 @@ void fetchDataPasien(){
     namaData = root["nama"].asString();
     nikData = root["nik"].asString();
 
-    // Serial.print("Nama: ");
-    // Serial.println(namaData);
-    // Serial.print("NIK: ");
-    // Serial.println(nikData);
-    
-    // namaData = "";
-    // nikData = "";
-
   } else {
     Serial.println("Tidak ada data");
   }
   http.end();
 }
 
-void putHearRateData() {
+void postHearRateData() {
   String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(bpm) + ",\"sensor2\":" + String(bpm) + "}";
   HTTPClient http;
   http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/heartrates");
   int httpCode = http.POST(jsonData);
-
-  if (httpCode > 0)
-  {
-    if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
-      Serial.println("Data heartrates berhasil diperbarui");
-    } else {
-      Serial.println("Gagal memperbarui data heartrates");
-    }
-  } 
-  else 
-  {
-    Serial.println("Tidak dapat terhubung ke server");
-  }
-
   http.end();
 }
 
-void putSaturationData() {
+void postSaturationData() {
   String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(spo2) + ",\"sensor2\":" + String(spo2) + "}";
   HTTPClient http;
-  http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/saturations");
+  http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/saturation");
   int httpCode = http.POST(jsonData);
+  http.end();
+}
 
-  if (httpCode > 0)
-  {
-    if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
-      Serial.println("Data saturations berhasil diperbarui");
-    } else {
-      Serial.println("Gagal memperbarui data saturations");
-    }
-  } 
-  else 
-  {
-    Serial.println("Tidak dapat terhubung ke server");
-  }
-
+void postTemperatureData() {
+  String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(temperature) + ",\"sensor2\":" + String(temperature) + "}";
+  HTTPClient http;
+  http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/suhu");
+  int httpCode = http.POST(jsonData);
   http.end();
 }
