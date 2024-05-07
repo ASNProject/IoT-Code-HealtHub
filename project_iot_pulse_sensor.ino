@@ -71,6 +71,7 @@ void loop(){
     poxData();
     if (!namaData.isEmpty() && !nikData.isEmpty()) {
       putHearRateData();
+      putSaturationData();
     }
     delay(1000);
   }
