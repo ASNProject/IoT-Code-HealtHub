@@ -13,7 +13,7 @@
 #define WIFI_SSID "SSID"
 #define WIFI_PASSWORD "password"
 ```
-- Change this code with your local ip address to all code 
+- Change this code with your local ip address to all http request
 ```
   http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/update");
 ```
