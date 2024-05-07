@@ -7,6 +7,7 @@
   #include <ESP8266HTTPClient.h>
 #endif
 #include <ArduinoJson.h>
+#include <Wire.h>
 
 WiFiClient wifiClient;
 
@@ -20,6 +21,15 @@ const int PulseWire = 0;
 int Threshold = 550;
 PulseSensorPlayground pulseSensor;
 int myBPM;
+//------------------ MAX30100 ----------------------//
+#include "MAX30100_PulseOximeter.h"
+#define REPORTING_PERIOD_MS     1000
+PulseOximeter pox;
+uint32_t tsLastReport = 0;
+int bpm;
+int spo2;
+
+
 
 //----------------- Fetch Data ---------------------//
 String namaData, nikData;
@@ -43,15 +53,24 @@ void setup() {
   if (pulseSensor.begin()) {
     Serial.println("PulseSensor Object !");
   }
+
+  //--------------- MAX30100 --------------------//
+  if (!pox.begin()) {
+    Serial.println("FAILED");
+    for(;;);
+  } else {
+    Serial.println("SUCCESS");
+  }
 }
 
 void loop(){
   if (WiFi.status() == WL_CONNECTED)
   {
     fetchDataPasien();
-    checkHeartbeat();
+    // checkHeartbeat();
+    poxData();
     if (!namaData.isEmpty() && !nikData.isEmpty()) {
-      putData();
+      putHearRateData();
     }
     delay(1000);
   }
@@ -67,6 +86,21 @@ void checkHeartbeat(){
   }
 
   delay(20);                    
+}
+
+void poxData(){
+  pox.update();
+      if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+        // Serial.print("Heart rate:");
+        // Serial.print(pox.getHeartRate());
+        // Serial.print("bpm / SpO2:");
+        // Serial.print(pox.getSpO2());
+        // Serial.println("%");
+        bpm = pox.getHeartRate();
+        spo2 = pox.getSpO2();
+
+        tsLastReport = millis();
+    }
 }
 
 void fetchDataPasien(){
@@ -98,8 +132,8 @@ void fetchDataPasien(){
   http.end();
 }
 
-void putData() {
-  String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(myBPM) + ",\"sensor2\":" + String(myBPM) + "}";
+void putHearRateData() {
+  String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(bpm) + ",\"sensor2\":" + String(bpm) + "}";
   HTTPClient http;
   http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/heartrates");
   int httpCode = http.POST(jsonData);
@@ -107,9 +141,31 @@ void putData() {
   if (httpCode > 0)
   {
     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
-      Serial.println("Data berhasil diperbarui");
+      Serial.println("Data heartrates berhasil diperbarui");
     } else {
-      Serial.println("Gagal memperbarui data");
+      Serial.println("Gagal memperbarui data heartrates");
+    }
+  } 
+  else 
+  {
+    Serial.println("Tidak dapat terhubung ke server");
+  }
+
+  http.end();
+}
+
+void putSaturationData() {
+  String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(spo2) + ",\"sensor2\":" + String(spo2) + "}";
+  HTTPClient http;
+  http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/saturations");
+  int httpCode = http.POST(jsonData);
+
+  if (httpCode > 0)
+  {
+    if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
+      Serial.println("Data saturations berhasil diperbarui");
+    } else {
+      Serial.println("Gagal memperbarui data saturations");
     }
   } 
   else 

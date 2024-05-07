@@ -4,6 +4,7 @@
 - ArduinoJson
 - HTTPClient
 - PulseSensorPlayground
+- MAX30100
 
 ### How To Use
 - change this code with your local ip address to all code 
