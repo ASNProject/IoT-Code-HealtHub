@@ -49,14 +49,9 @@ void loop(){
   if (WiFi.status() == WL_CONNECTED)
   {
     fetchDataPasien();
+    checkHeartbeat();
     if (!namaData.isEmpty() && !nikData.isEmpty()) {
-      Serial.print("Nama: ");
-      Serial.println(namaData);
-      Serial.print("NIK: ");
-      Serial.println(nikData);
-    
-      namaData = "";
-      nikData = "";
+      putData();
     }
     delay(1000);
   }
@@ -66,9 +61,9 @@ void checkHeartbeat(){
   if (pulseSensor.sawStartOfBeat()) {           
     myBPM = pulseSensor.getBeatsPerMinute();  
                                                
-    Serial.println("♥  A HeartBeat Happened ! "); 
-    Serial.print("BPM: ");                        
-    Serial.println(myBPM);                        
+    // Serial.println("♥  A HeartBeat Happened ! "); 
+    // Serial.print("BPM: ");                        
+    // Serial.println(myBPM);                        
   }
 
   delay(20);                    
@@ -89,6 +84,14 @@ void fetchDataPasien(){
     namaData = root["nama"].asString();
     nikData = root["nik"].asString();
 
+    // Serial.print("Nama: ");
+    // Serial.println(namaData);
+    // Serial.print("NIK: ");
+    // Serial.println(nikData);
+    
+    // namaData = "";
+    // nikData = "";
+
   } else {
     Serial.println("Tidak ada data");
   }
@@ -96,11 +99,10 @@ void fetchDataPasien(){
 }
 
 void putData() {
-  String jsonData = "{\"nama\":\"Nama Baru\",\"nik\":\"NIK Baru\"}";
-
+  String jsonData = "{\"nama\":\"" + namaData + "\",\"nik\":\"" + nikData + "\",\"sensor1\":" + String(myBPM) + ",\"sensor2\":" + String(myBPM) + "}";
   HTTPClient http;
-  http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/update/1");
-  int httpCode = http.PUT(jsonData);
+  http.begin(wifiClient, "http://192.168.1.2/healthub/rest_api/api.php/heartrates");
+  int httpCode = http.POST(jsonData);
 
   if (httpCode > 0)
   {
